@@ -72,7 +72,7 @@ jobs:
 
             - name: Compile for All Platforms
               run: |
-                echo ""Cross compiling for all platforms
+                echo "Cross compiling for all platforms"
                 GOOS=linux GOARCH=amd64 go build -o main-linux main.go
                 GOOS=windows GOARCH=amd64 go build -o main-windows.exe main.go
                 GOOS=darwin GOARCH=amd64 go build -o main-macos-intel main.go
