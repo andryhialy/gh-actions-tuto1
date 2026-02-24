@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Sample application stack with staging/production Lambda functions, IAM service account,
+  and access credentials. Protect generated credentials and delete this stack when finished.
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub sample-app-lambda-exec-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  StagingLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub sample-app-staging-${AWS::StackName}
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      Environment:
+        Variables:
+          APP_ENV: staging
+      Code:
+        ZipFile: |
+          exports.handler = async () => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({
+                environment: process.env.APP_ENV,
+                message: "Hello from staging"
+              })
+            };
+          };
+
+  ProductionLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub sample-app-production-${AWS::StackName}
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      Environment:
+        Variables:
+          APP_ENV: production
+      Code:
+        ZipFile: |
+          exports.handler = async () => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({
+                environment: process.env.APP_ENV,
+                message: "Hello from production"
+              })
+            };
+          };
+
+  StagingLambdaUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref StagingLambdaFunction
+      AuthType: NONE
+
+  ProductionLambdaUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref ProductionLambdaFunction
+      AuthType: NONE
+
+  StagingLambdaUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StagingLambdaFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  ProductionLambdaUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ProductionLambdaFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  ServiceAccountGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub sample-app-lambda-admins-${AWS::StackName}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+
+  ServiceAccountUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub sample-app-service-account-${AWS::StackName}
+      Groups:
+        - !Ref ServiceAccountGroup
+
+  ServiceAccountAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref ServiceAccountUser
+      Status: Active
+
+Outputs:
+  Region:
+    Description: AWS Region where this stack is deployed.
+    Value: !Ref AWS::Region
+
+  AccountId:
+    Description: AWS Account ID where this stack is deployed.
+    Value: !Ref AWS::AccountId
+
+  StagingUrl:
+    Description: Public Function URL for the staging Lambda.
+    Value: !GetAtt StagingLambdaUrl.FunctionUrl
+
+  ProductionUrl:
+    Description: Public Function URL for the production Lambda.
+    Value: !GetAtt ProductionLambdaUrl.FunctionUrl
+
+  ServiceAccountAccessKeyId:
+    Description: Access key ID for the service account.
+    Value: !Ref ServiceAccountAccessKey
+
+  ServiceAccountSecretAccessKey:
+    Description: Secret access key for the service account (store securely).
+    Value: !GetAtt ServiceAccountAccessKey.SecretAccessKey
+
+  SecurityWarning:
+    Description: Security warning.
+    Value: "Protect these credentials immediately (use a secure secret manager) and delete this stack when you are finished."
