@@ -17,7 +17,7 @@ jobs:
         steps:
             - name: Step Two One
               uses: actions/checkout@v4
-            - name: Step Two
+            - name: Step Two Two
               run: "Get-Childitem Env: | Sort-Object Name"
 
     
